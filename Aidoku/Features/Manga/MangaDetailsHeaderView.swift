@@ -41,6 +41,8 @@ struct MangaDetailsHeaderView: View {
     var onTitlePressed: (() -> Void)?
     var onTrackerButtonPressed: (() -> Void)?
     var onReadButtonPressed: (() -> Void)?
+    /// Same refresh as the "..." menu's "刷新详情" item.
+    var onRefreshButtonPressed: (() -> Void)?
 
     @EnvironmentObject private var path: NavigationCoordinator
 
@@ -78,7 +80,8 @@ struct MangaDetailsHeaderView: View {
         transitionNamespace: Namespace.ID,
         onTitlePressed: (() -> Void)? = nil,
         onTrackerButtonPressed: (() -> Void)? = nil,
-        onReadButtonPressed: (() -> Void)? = nil
+        onReadButtonPressed: (() -> Void)? = nil,
+        onRefreshButtonPressed: (() -> Void)? = nil
     ) {
         self._source = source
         self._manga = manga
@@ -103,6 +106,7 @@ struct MangaDetailsHeaderView: View {
         self.onTitlePressed = onTitlePressed
         self.onTrackerButtonPressed = onTrackerButtonPressed
         self.onReadButtonPressed = onReadButtonPressed
+        self.onRefreshButtonPressed = onRefreshButtonPressed
 
         self._isTracking = State(initialValue: TrackerManager.shared.isTracking(
             mangaId: manga.wrappedValue.identifier
@@ -383,6 +387,20 @@ struct MangaDetailsHeaderView: View {
                 } message: {
                     Text(NSLocalizedString("LINK_COPIED_TEXT"))
                 }
+            }
+
+            // Same refresh as the "..." menu's "刷新详情" (same icon,
+            // same action), shown under the same conditions. The shared
+            // MangaActionButtonStyle keeps it the same size as the
+            // bookmark / open-in-browser buttons and on the same row.
+            if bookmarked, #available(iOS 18.0, *) {
+                Button {
+                    onRefreshButtonPressed?()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(MangaActionButtonStyle())
+                .accessibilityLabel(NSLocalizedString("REFRESH_DETAILS"))
             }
         }
     }

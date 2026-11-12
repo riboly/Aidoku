@@ -317,6 +317,10 @@ extension MangaView {
                     if let nextChapter = viewModel.nextChapter {
                         openChapter = nextChapter
                     }
+                },
+                onRefreshButtonPressed: {
+                    // Same action as the "..." menu's "刷新详情".
+                    refreshController.refresh()
                 }
             )
             .environmentObject(path)

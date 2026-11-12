@@ -127,24 +127,26 @@ class ReaderToolbarView: UIView {
 
         NSLayoutConstraint.activate([
             incognitoModeLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            incognitoModeLabel.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -9),
+            incognitoModeLabel.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -10),
 
             // Bottom row, all vertically centered on the same line:
             // chapter icon at the leading edge, page count centered,
             // and previous/next chapter grouped together at the trailing
-            // edge. The old layout put "previous" on the left and "next"
-            // alone on the right, leaving a large empty gap in between.
+            // edge. The row sits at the vertical middle of the whole
+            // visible bottom bar: this view is 54pt tall and the toolbar
+            // adds the home-indicator safe area below it (~34pt), so the
+            // bar is ~88pt and its middle is ~44pt from the top.
             chapterButton.leadingAnchor.constraint(equalTo: incognitoModeLabel.trailingAnchor, constant: 8),
-            chapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -9),
+            chapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -10),
 
             previousChapterButton.trailingAnchor.constraint(equalTo: nextChapterButton.leadingAnchor, constant: -16),
-            previousChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -9),
+            previousChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -10),
 
             currentPageLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            currentPageLabel.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -9),
+            currentPageLabel.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -10),
 
             nextChapterButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            nextChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -9),
+            nextChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -10),
 
             sliderView.heightAnchor.constraint(equalToConstant: 12),
             sliderView.topAnchor.constraint(equalTo: topAnchor, constant: 10),

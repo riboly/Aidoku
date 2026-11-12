@@ -233,17 +233,18 @@ class ReaderViewController: BaseObservingViewController {
         toolbarView.onNextChapterTap = { [weak self] in self?.nextChapter() }
         toolbarView.translatesAutoresizingMaskIntoConstraints = false
         let toolbarButtonItemView = UIBarButtonItem(customView: toolbarView)
-        toolbarButtonItemView.customView?.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        toolbarButtonItemView.customView?.heightAnchor.constraint(equalToConstant: 54).isActive = true
         if #available(iOS 26.0, *) {
             toolbarViewWidthConstraint = toolbarButtonItemView.customView?.widthAnchor.constraint(
                 equalToConstant: node.bounds.width - 32 - 10
             )
-            // shift down farther to account for different toolbar and slider knob size
-            toolbarButtonItemView.customView?.transform = CGAffineTransform(translationX: 0, y: -5)
         } else {
             toolbarViewWidthConstraint = toolbarButtonItemView.customView?.widthAnchor.constraint(equalToConstant: view.bounds.width)
-            toolbarButtonItemView.customView?.transform = CGAffineTransform(translationX: 0, y: -10)
         }
+        // No upward shift on the toolbar view: the bottom row is meant to
+        // sit at the vertical middle of the whole bottom bar, and the old
+        // -5 / -10 shift pushed it up above the middle, leaving a large
+        // empty gap down to the home indicator.
 
         add(child: descriptionButtonController)
         view.addSubview(autoScrollButton)
