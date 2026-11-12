@@ -43,18 +43,12 @@ class ReaderToolbarView: UIView {
     private let currentPageLabel = UILabel()
 
     private lazy var chapterButton: UIButton = {
+        // Icon only, no text: the list icon is the chapter list button.
         var configuration = UIButton.Configuration.plain()
         configuration.image = UIImage(systemName: "list.bullet")
-        configuration.title = NSLocalizedString("CHAPTER")
-        configuration.imagePlacement = .leading
-        configuration.imagePadding = 4
-        configuration.contentInsets = .init(top: 0, leading: 0, bottom: 0, trailing: 0)
-        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
-            var outgoing = incoming
-            outgoing.font = .systemFont(ofSize: 13, weight: .medium)
-            return outgoing
-        }
+        configuration.contentInsets = .init(top: 0, leading: 4, bottom: 0, trailing: 4)
         let button = UIButton(configuration: configuration)
+        button.accessibilityLabel = NSLocalizedString("CHAPTER")
         button.addTarget(self, action: #selector(chapterButtonTapped), for: .touchUpInside)
         return button
     }()
@@ -62,7 +56,7 @@ class ReaderToolbarView: UIView {
     private lazy var previousChapterButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
         configuration.title = NSLocalizedString("PREVIOUS_CHAPTER")
-        configuration.contentInsets = .init(top: 0, leading: 0, bottom: 0, trailing: 0)
+        configuration.contentInsets = .init(top: 0, leading: 4, bottom: 0, trailing: 4)
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
             outgoing.font = .systemFont(ofSize: 13, weight: .medium)
@@ -76,7 +70,7 @@ class ReaderToolbarView: UIView {
     private lazy var nextChapterButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
         configuration.title = NSLocalizedString("NEXT_CHAPTER")
-        configuration.contentInsets = .init(top: 0, leading: 0, bottom: 0, trailing: 0)
+        configuration.contentInsets = .init(top: 0, leading: 4, bottom: 0, trailing: 4)
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
             outgoing.font = .systemFont(ofSize: 13, weight: .medium)
@@ -110,6 +104,9 @@ class ReaderToolbarView: UIView {
         currentPageLabel.font = .systemFont(ofSize: 10)
         currentPageLabel.textAlignment = .center
         currentPageLabel.sizeToFit()
+        // Let the page count give way first on narrow screens, so the
+        // chapter buttons never get pushed off the bar.
+        currentPageLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         addSubview(currentPageLabel)
 
         sliderView.semanticContentAttribute = .playback // for rtl languages
@@ -129,24 +126,25 @@ class ReaderToolbarView: UIView {
         sliderView.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
-            incognitoModeLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
-            incognitoModeLabel.bottomAnchor.constraint(equalTo: bottomAnchor),
+            incognitoModeLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            incognitoModeLabel.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -9),
 
-            // Bottom row, left to right: chapter list, previous chapter,
-            // current page, next chapter. The "pages left" label was removed:
-            // it is redundant with the "2 / 46" page count, and its spot is
-            // now the next-chapter button.
+            // Bottom row, all vertically centered on the same line:
+            // chapter icon at the leading edge, page count centered,
+            // and previous/next chapter grouped together at the trailing
+            // edge. The old layout put "previous" on the left and "next"
+            // alone on the right, leaving a large empty gap in between.
             chapterButton.leadingAnchor.constraint(equalTo: incognitoModeLabel.trailingAnchor, constant: 8),
-            chapterButton.bottomAnchor.constraint(equalTo: bottomAnchor),
+            chapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -9),
 
-            previousChapterButton.leadingAnchor.constraint(equalTo: chapterButton.trailingAnchor, constant: 8),
-            previousChapterButton.bottomAnchor.constraint(equalTo: bottomAnchor),
+            previousChapterButton.trailingAnchor.constraint(equalTo: nextChapterButton.leadingAnchor, constant: -16),
+            previousChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -9),
 
             currentPageLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            currentPageLabel.bottomAnchor.constraint(equalTo: bottomAnchor),
+            currentPageLabel.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -9),
 
             nextChapterButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            nextChapterButton.bottomAnchor.constraint(equalTo: bottomAnchor),
+            nextChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -9),
 
             sliderView.heightAnchor.constraint(equalToConstant: 12),
             sliderView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
