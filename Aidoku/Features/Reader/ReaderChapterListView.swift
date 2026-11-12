@@ -22,6 +22,11 @@ struct ReaderChapterListView: View {
                     Button {
                         self.chapter = chapter
                         chapterSet?(chapter)
+                        // Close the list right after a manual pick: the
+                        // chapter is already checked and loading behind
+                        // it, so keeping the list open only blocks the
+                        // reader the user just jumped to.
+                        dismiss()
                     } label: {
                         HStack {
                             VStack(alignment: .leading) {
