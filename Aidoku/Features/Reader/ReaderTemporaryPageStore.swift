@@ -21,6 +21,14 @@ actor ReaderTemporaryPageStore {
     }
 
     private var extractedArchiveEntries: [ArchiveEntryKey: URL] = [:]
+    /// Insertion order of `extractedArchiveEntries`, for FIFO eviction.
+    private var extractedArchiveOrder: [ArchiveEntryKey] = []
+    /// Cap on extracted CBZ/ZIP pages kept on disk per reader session.
+    /// Without a cap, reading dozens of chapters in one session leaves
+    /// every extracted page in Caches/ReaderSessions until the reader is
+    /// closed. Eviction is safe: a missing entry is re-extracted on
+    /// demand by `storeArchiveEntry`.
+    private static let maxExtractedArchiveEntries = 100
 
     init() {
         directory = Self.sessionsDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -79,6 +87,15 @@ actor ReaderTemporaryPageStore {
 
             _ = try archive.extract(entry, to: fileURL, skipCRC32: true)
             extractedArchiveEntries[key] = fileURL
+            extractedArchiveOrder.append(key)
+            // Evict the oldest extracted pages past the cap, so a long
+            // session cannot grow this directory without bound.
+            while extractedArchiveOrder.count > Self.maxExtractedArchiveEntries {
+                let oldestKey = extractedArchiveOrder.removeFirst()
+                if let oldestURL = extractedArchiveEntries.removeValue(forKey: oldestKey) {
+                    oldestURL.removeItem()
+                }
+            }
 
             return fileURL
         } catch {
@@ -89,6 +106,8 @@ actor ReaderTemporaryPageStore {
     }
 
     func removeAll() {
+        extractedArchiveEntries.removeAll()
+        extractedArchiveOrder.removeAll()
         directory.removeItem()
     }
 

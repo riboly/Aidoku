@@ -361,6 +361,8 @@
 // Reader
 "VOLUME" = "Volume";
 "CHAPTER" = "Chapter";
+"PREVIOUS_CHAPTER" = "Previous Chapter";
+"NEXT_CHAPTER" = "Next Chapter";
 "CHAPTERS" = "Chapters";
 "VOLUME_X" = "Volume %g";
 "CHAPTER_X" = "Chapter %g";

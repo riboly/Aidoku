@@ -36,10 +36,13 @@ class ReaderPagedViewModel {
             preloadedPages = []
             preloadedChapter = nil
         } else {
-            if !pages.isEmpty {
-                preloadedChapter = chapter
-                preloadedPages = pages
-            }
+            // Don't stash the old chapter's pages as "preloaded" for the
+            // new chapter: Page holds decoded UIImages for embedded /
+            // split pages, so that stash kept a whole extra chapter of
+            // images in memory until the next preload overwrote it, and
+            // it was mislabelled as the new chapter's preload anyway.
+            // Going back re-fetches the page list (images come from the
+            // Nuke disk cache, so they are not re-downloaded).
             self.chapter = chapter
             pages = await getPages(chapter: chapter)
         }

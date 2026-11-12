@@ -955,14 +955,20 @@ extension ReaderPagedViewController: ReaderReaderDelegate {
     }
 
     func loadPreviousChapter() {
-        guard let previousChapter else { return }
+        // Ignore stale transition callbacks that fire after the chapter
+        // already changed: reloading the same target again would jump
+        // past the chapter the user actually landed on.
+        guard let previousChapter, previousChapter != chapter else { return }
         nextPreviewSplitPages = splitPages[1]
         delegate?.setChapter(previousChapter)
         setChapter(previousChapter, startPage: Int.max)
     }
 
     func loadNextChapter() {
-        guard let nextChapter else { return }
+        // Ignore stale transition callbacks that fire after the chapter
+        // already changed: reloading the same target again would jump
+        // past the chapter the user actually landed on.
+        guard let nextChapter, nextChapter != chapter else { return }
         previousPreviewSplitPages = splitPages[viewModel.pages.count]
         delegate?.setChapter(nextChapter)
         setChapter(nextChapter, startPage: 1)

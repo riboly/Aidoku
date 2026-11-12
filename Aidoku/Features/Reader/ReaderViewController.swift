@@ -184,18 +184,14 @@ class ReaderViewController: BaseObservingViewController {
         node.backgroundColor = .systemBackground
         navigationController?.navigationBar.prefersLargeTitles = false
 
-        // navbar buttons
+        // navbar buttons: only close stays at the top left. The chapter
+        // list button moved to the bottom toolbar (see ReaderToolbarView),
+        // so it is reachable with the thumb while reading.
         navigationItem.leftBarButtonItems = [
             UIBarButtonItem(
                 barButtonSystemItem: .close,
                 target: self,
                 action: #selector(close)
-            ),
-            UIBarButtonItem(
-                image: UIImage(systemName: "list.bullet"),
-                style: .plain,
-                target: self,
-                action: #selector(openChapterList)
             )
         ]
         let moreButton = UIBarButtonItem(
@@ -232,6 +228,9 @@ class ReaderViewController: BaseObservingViewController {
         // toolbar view
         toolbarView.sliderView.addTarget(self, action: #selector(sliderMoved(_:)), for: .valueChanged)
         toolbarView.sliderView.addTarget(self, action: #selector(sliderStopped(_:)), for: .editingDidEnd)
+        toolbarView.onChapterListTap = { [weak self] in self?.openChapterList() }
+        toolbarView.onPreviousChapterTap = { [weak self] in self?.previousChapter() }
+        toolbarView.onNextChapterTap = { [weak self] in self?.nextChapter() }
         toolbarView.translatesAutoresizingMaskIntoConstraints = false
         let toolbarButtonItemView = UIBarButtonItem(customView: toolbarView)
         toolbarButtonItemView.customView?.heightAnchor.constraint(equalToConstant: 40).isActive = true
@@ -556,6 +555,7 @@ extension ReaderViewController {
             needsChapters: true
         )
         chapterList = updatedManga?.chapters ?? []
+        updateChapterNavigationButtons()
     }
 
     func loadCurrentChapter() {
@@ -605,6 +605,13 @@ extension ReaderViewController {
         navigationItem.setTitle(upper: volume, lower: title)
         // re-apply theme title colors, since setTitle recreates the title view
         updateTextThemeOverride()
+        updateChapterNavigationButtons()
+    }
+
+    /// Enable/disable the bottom toolbar's previous/next chapter buttons.
+    func updateChapterNavigationButtons() {
+        toolbarView.hasPreviousChapter = getPreviousChapter() != nil
+        toolbarView.hasNextChapter = getNextChapter() != nil
     }
 
     func showLoadFailAlert() {

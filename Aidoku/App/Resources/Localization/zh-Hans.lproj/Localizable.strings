@@ -92,6 +92,8 @@
 
 // Reader
 "CHAPTER" = "章节";
+"PREVIOUS_CHAPTER" = "上一章";
+"NEXT_CHAPTER" = "下一章";
 "CHAPTERS" = "章节";
 "VOLUME_X" = "第 %g 卷";
 "CHAPTER_X" = "第 %g 章";

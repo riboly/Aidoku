@@ -38,6 +38,10 @@ class ReaderWebtoonViewController: ZoomableCollectionViewController {
     private var chapters: [AidokuRunner.Chapter] = []
     // The pages corresponding to the `chapters` variable
     private var pages: [[Page]] = []
+    /// Set after a chapter switch during one drag/fling, so a single
+    /// swipe can move at most one chapter (see scrollViewDidScroll).
+    /// Reset when a new drag starts and when scrolling settles.
+    private var didMoveChapterDuringCurrentScroll = false
     private var dictionaryOverlayTapHandler: ((String, String, CGRect, [CGRect]) -> Void)?
     private var dictionaryOverlayInteractionMode: DictionaryOverlayInteractionMode = .none
 
@@ -171,11 +175,14 @@ class ReaderWebtoonViewController: ZoomableCollectionViewController {
             self?.setLiveTextButtonHidden(true)
         }
 
-        addObserver(forName: UIApplication.didReceiveMemoryWarningNotification.rawValue) { _ in
+        addObserver(forName: UIApplication.didReceiveMemoryWarningNotification.rawValue) { [weak self] _ in
             LogManager.logger.warn("Received memory warning in webtoon reader")
 
             // clear image memory cache
             ImagePipeline.shared.configuration.imageCache?.removeAll()
+            // drop chapters far from the current one; their pages are
+            // reloaded from the disk cache / source if the user goes back
+            self?.trimDistantChapters()
         }
     }
 
@@ -225,6 +232,16 @@ class ReaderWebtoonViewController: ZoomableCollectionViewController {
         else { return false }
         if let chapter, chapters.firstIndex(of: chapter) == index { return false }
 
+        // A section two or more chapters away from the current one cannot
+        // be on screen: the current chapter and its immediate neighbours
+        // sit between it and the viewport. Trim it even when its layout
+        // has not been calculated yet (zero-height attributes), otherwise
+        // a missed trim is never retried and sections pile up chapter
+        // after chapter, which is what made long sessions lag and crash.
+        if let currentIndex = chapter.flatMap({ chapters.firstIndex(of: $0) }), abs(index - currentIndex) >= 2 {
+            return true
+        }
+
         // test the section's frame against the viewport rather than sampling index paths
         guard
             !pages[index].isEmpty,
@@ -235,6 +252,52 @@ class ReaderWebtoonViewController: ZoomableCollectionViewController {
         else { return false }
         let visible = CGRect(origin: collectionNode.contentOffset, size: collectionNode.bounds.size)
         return lastFrame.maxY <= visible.minY || firstFrame.minY >= visible.maxY
+    }
+
+    /// Drop the chapter farthest from the current one when more than
+    /// `maxRetainedChapters` are held. Append/prepend only attempt a trim
+    /// at insert time, so this is also called when scrolling settles and
+    /// on memory warnings to catch the trims those inserts missed.
+    private func trimDistantChapters() {
+        guard
+            chapters.count > maxRetainedChapters,
+            let chapter,
+            let currentIndex = chapters.firstIndex(of: chapter),
+            !isScrolling,
+            !isZooming
+        else { return }
+        // Trim above first (oldest), otherwise the farthest below.
+        let trimIndex: Int
+        if currentIndex >= 2 {
+            trimIndex = 0
+        } else if chapters.count - 1 - currentIndex >= 2 {
+            trimIndex = chapters.count - 1
+        } else {
+            return
+        }
+        guard canTrimSection(at: trimIndex) else { return }
+
+        Task { @MainActor [weak self] in
+            guard
+                let self,
+                let currentChapter = self.chapter,
+                chapters.count > maxRetainedChapters,
+                let currentIndex = chapters.firstIndex(of: currentChapter),
+                trimIndex < chapters.count,
+                canTrimSection(at: trimIndex)
+            else { return }
+            if trimIndex < currentIndex {
+                let layout = collectionNode.collectionViewLayout as? VerticalContentOffsetPreservingLayout
+                layout?.preserveOffsetAcrossChangeAbove()
+            }
+            chapters.remove(at: trimIndex)
+            pages.remove(at: trimIndex)
+            await collectionNode.performBatch(animated: false) {
+                collectionNode.deleteSections(IndexSet(integer: trimIndex))
+            }
+            scrollView.contentOffset = collectionNode.contentOffset
+            zoomView.adjustContentSize()
+        }
     }
 
     private func setLiveTextButtonHidden(_ hidden: Bool) {
@@ -355,6 +418,8 @@ extension ReaderWebtoonViewController {
 extension ReaderWebtoonViewController {
     override func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         super.scrollViewWillBeginDragging(scrollView)
+        // A new drag may move to the next/previous chapter once.
+        didMoveChapterDuringCurrentScroll = false
         restorePreloadRange()
         pauseAutoScroll()
         setLiveTextButtonHidden(true)
@@ -379,15 +444,34 @@ extension ReaderWebtoonViewController {
         let pageSection = pagePath?.section ?? 0
 
         if infinite {
-            // check if we need to switch chapters
+            // The middle of the screen is inside the current chapter, so
+            // the user is actually reading it: a later crossing is a
+            // fresh, intentional chapter switch. This also re-arms the
+            // switch for auto-scroll, which never starts a new drag.
+            if pageSection == chapterIndex {
+                didMoveChapterDuringCurrentScroll = false
+            }
+        }
+
+        if infinite, !didMoveChapterDuringCurrentScroll {
+            // check if we need to switch chapters. Only one switch per
+            // drag/fling: without this, a fast fling from the end of one
+            // chapter crosses the next chapter's whole section in a few
+            // scroll events and lands two chapters ahead (e.g. 5 -> 7),
+            // skipping the chapter in between. Weak networks make it
+            // worse, because failed pages keep their placeholder height
+            // and the layout jumps as images load in.
+            let chapterBeforeMove = chapter
             if chapterIndex > 0 && pageSection < chapterIndex {
                 movePreviousChapter()
-                needsInfoRefresh = true
             } else if chapterIndex < chapters.count - 1 {
                 if pageSection > chapterIndex {
                     moveNextChapter()
-                    needsInfoRefresh = true
                 }
+            }
+            if self.chapter != chapterBeforeMove {
+                didMoveChapterDuringCurrentScroll = true
+                needsInfoRefresh = true
             }
         }
 
@@ -612,31 +696,39 @@ extension ReaderWebtoonViewController {
             return
         }
         setLiveTextButtonHidden(false)
+        // Scrolling settled: the next drag may move chapters again, and
+        // any chapters far from the current one can now be trimmed.
+        didMoveChapterDuringCurrentScroll = false
 
         if infinite {
             isScrolling = false
             checkInfiniteLoad()
         }
+        trimDistantChapters()
         resumeAutoScroll()
         updateContentScrollingState()
     }
 
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         setLiveTextButtonHidden(false)
+        didMoveChapterDuringCurrentScroll = false
         if infinite {
             isScrolling = false
             checkInfiniteLoad()
         }
+        trimDistantChapters()
         resumeAutoScroll()
         updateContentScrollingState()
     }
 
     func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
         setLiveTextButtonHidden(false)
+        didMoveChapterDuringCurrentScroll = false
         if infinite {
             isScrolling = false
             checkInfiniteLoad()
         }
+        trimDistantChapters()
     }
 
     // check if at the top or bottom to append the next/prev chapter
@@ -695,6 +787,14 @@ extension ReaderWebtoonViewController {
         if preloadedPages.isEmpty {
             return
         }
+
+        // The preload awaits the network, so the user may have jumped to
+        // another chapter (e.g. via the chapter list) in the meantime.
+        // Only prepend the chapter that is still the immediate previous
+        // one, or the current chapter itself.
+        guard !chapters.contains(prevChapter),
+              delegate?.getPreviousChapter() == prevChapter || chapter == prevChapter
+        else { return }
 
         // wait until zooming and scrolling stops
         while isZooming || isScrolling {
@@ -759,6 +859,14 @@ extension ReaderWebtoonViewController {
             return
         }
 
+        // The preload awaits the network, so the user may have jumped to
+        // another chapter (e.g. via the chapter list) in the meantime.
+        // Only append the chapter that is still the immediate next one,
+        // or the current chapter itself.
+        guard !chapters.contains(nextChapter),
+              delegate?.getNextChapter() == nextChapter || chapter == nextChapter
+        else { return }
+
         // wait until zooming and scrolling stops
         while isZooming || isScrolling {
             try? await Task.sleep(nanoseconds: 500_000_000)
@@ -814,13 +922,18 @@ extension ReaderWebtoonViewController {
             let currChapter = chapter,
             let chapterIndex = chapters.firstIndex(of: currChapter),
             let chapter = chapters[safe: chapterIndex - 1],
-            let pages = pages[safe: chapterIndex - 1]
+            let pages = pages[safe: chapterIndex - 1],
+            // Don't switch into a chapter with no readable pages (e.g.
+            // its page list failed to load on a bad network): switching
+            // there would immediately trigger another switch past it.
+            pages.contains(where: { $0.type == .imagePage })
         else { return }
         self.chapter = chapter
         updateDoubleTapZoomSetting()
         delegate?.setChapter(chapter)
         delegate?.setPages(pages.filter({ $0.type == .imagePage }))
         viewModel.setPages(chapter: chapter, pages: pages)
+        trimDistantChapters()
     }
 
     /// Switch current chapter to next
@@ -829,13 +942,18 @@ extension ReaderWebtoonViewController {
             let currChapter = chapter,
             let chapterIndex = chapters.firstIndex(of: currChapter),
             let chapter = chapters[safe: chapterIndex + 1],
-            let pages = pages[safe: chapterIndex + 1]
+            let pages = pages[safe: chapterIndex + 1],
+            // Don't switch into a chapter with no readable pages (e.g.
+            // its page list failed to load on a bad network): switching
+            // there would immediately trigger another switch past it.
+            pages.contains(where: { $0.type == .imagePage })
         else { return }
         self.chapter = chapter
         updateDoubleTapZoomSetting()
         delegate?.setChapter(chapter)
         delegate?.setPages(pages.filter({ $0.type == .imagePage }))
         viewModel.setPages(chapter: chapter, pages: pages)
+        trimDistantChapters()
     }
 
     /// Refresh info page chapter info
