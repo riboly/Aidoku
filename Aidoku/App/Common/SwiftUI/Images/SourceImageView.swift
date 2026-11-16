@@ -21,6 +21,9 @@ struct SourceImageView: View {
     var placeholder = "MangaPlaceholder"
 
     @State private var imageRequest: ImageRequest?
+    /// Failed remote cover loads are retried (see scheduleCoverRetry).
+    @State private var retryCount = 0
+    @State private var retryTask: Task<Void, Never>?
 
     private var processors: [ImageProcessing] {
         var processors: [ImageProcessing] = []
@@ -59,6 +62,14 @@ struct SourceImageView: View {
             }
         }
         .processors(processors)
+        .onCompletion { result in
+            switch result {
+            case .success:
+                retryCount = 0
+            case .failure:
+                scheduleCoverRetry()
+            }
+        }
         .onAppear {
             guard imageRequest == nil else { return }
             Task {
@@ -66,10 +77,36 @@ struct SourceImageView: View {
             }
         }
         .onChange(of: imageUrl) { newValue in
+            retryTask?.cancel()
+            retryTask = nil
+            retryCount = 0
             imageRequest = nil
             Task {
                 await loadImageRequest(url: newValue)
             }
+        }
+        .onDisappear {
+            retryTask?.cancel()
+            retryTask = nil
+        }
+    }
+
+    /// Retry a failed remote cover fetch up to 3 times, 5 seconds apart.
+    /// Local covers (aidoku-image://, file URLs) are not retried: if the
+    /// file is missing, retrying cannot bring it back.
+    private func scheduleCoverRetry() {
+        guard imageUrl.hasPrefix("http"), retryCount < 3 else { return }
+        retryTask?.cancel()
+        retryCount += 1
+        retryTask = Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled else { return }
+            // Re-issue the request: clear it first so LazyImage reloads
+            // the same URL instead of reusing the failed result. The
+            // Nuke cache is still consulted first, so a cover that has
+            // since been cached loads without hitting the network.
+            imageRequest = nil
+            await loadImageRequest(url: imageUrl)
         }
     }
 

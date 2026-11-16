@@ -626,7 +626,16 @@ extension MangaManager {
 
                     // update details
                     if updateMetadata {
+                        // Keep the existing cover: if this manga already
+                        // has a cover, reuse it instead of letting the
+                        // source's cover (or lack of one) replace it.
+                        // Only manga without a cover pick up the
+                        // refreshed cover from the source.
+                        let existingCover = mangaObject.cover
                         mangaObject.load(from: newManga)
+                        if let existingCover, !existingCover.isEmpty {
+                            mangaObject.cover = existingCover
+                        }
                     }
 
                     // update chapters
@@ -693,7 +702,13 @@ extension MangaManager {
         if updateMetadata {
             for mangaItem in filteredManga {
                 guard let newInfo = newDetails[mangaItem.hashValue] else { continue }
+                // Same cover rule as the database update above: keep the
+                // existing cover, only coverless manga take the new one.
+                let existingCover = mangaItem.coverUrl
                 mangaItem.load(from: newInfo.toOld())
+                if let existingCover {
+                    mangaItem.coverUrl = existingCover
+                }
             }
         }
 
