@@ -902,6 +902,15 @@ extension ReaderPagedViewController: ReaderReaderDelegate {
             if chapter != nextChapter {
                 pagePrefetcher.reset()
             }
+            // Jump to the new chapter at once instead of leaving the old
+            // chapter on screen until its page list finishes loading:
+            // swap the displayed page for a blank placeholder now; the
+            // loading task below rebuilds the real pages when they
+            // arrive. The page-controller array is left intact so the
+            // rebuild can still reuse the adjacent chapter's controllers.
+            let placeholder = UIViewController()
+            placeholder.view.backgroundColor = .black
+            pageViewController.setViewControllers([placeholder], direction: .forward, animated: false)
         }
         self.chapter = chapter
         Task {

@@ -32,10 +32,22 @@ class ReaderToolbarView: UIView {
     var onNextChapterTap: (() -> Void)?
 
     var hasPreviousChapter: Bool = true {
-        didSet { previousChapterButton.isEnabled = hasPreviousChapter }
+        didSet { updateChapterButtonStates() }
     }
     var hasNextChapter: Bool = true {
-        didSet { nextChapterButton.isEnabled = hasNextChapter }
+        didSet { updateChapterButtonStates() }
+    }
+    /// True while a chapter switch started from these buttons is still
+    /// loading its page list: the buttons stay disabled so a second tap
+    /// cannot queue up another switch (and skip a chapter) before the
+    /// first one lands.
+    var isSwitchingChapter: Bool = false {
+        didSet { updateChapterButtonStates() }
+    }
+
+    private func updateChapterButtonStates() {
+        previousChapterButton.isEnabled = hasPreviousChapter && !isSwitchingChapter
+        nextChapterButton.isEnabled = hasNextChapter && !isSwitchingChapter
     }
 
     let sliderView = ReaderSliderView()
@@ -127,29 +139,29 @@ class ReaderToolbarView: UIView {
 
         NSLayoutConstraint.activate([
             incognitoModeLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            incognitoModeLabel.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+            incognitoModeLabel.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -19),
 
             // Bottom row, all vertically centered on the same line:
             // chapter icon at the leading edge, page count centered,
             // and previous/next chapter grouped together at the trailing
             // edge. The row sits at the vertical middle of the whole
-            // visible bottom bar: this view is 54pt tall and the toolbar
+            // visible bottom bar: this view is 72pt tall and the toolbar
             // adds the home-indicator safe area below it (~34pt), so the
-            // bar is ~88pt and its middle is ~44pt from the top.
+            // bar is ~106pt and its middle is ~53pt from the top.
             chapterButton.leadingAnchor.constraint(equalTo: incognitoModeLabel.trailingAnchor, constant: 8),
-            chapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+            chapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -19),
 
-            previousChapterButton.trailingAnchor.constraint(equalTo: nextChapterButton.leadingAnchor, constant: -16),
-            previousChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+            previousChapterButton.trailingAnchor.constraint(equalTo: nextChapterButton.leadingAnchor, constant: -28),
+            previousChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -19),
 
             currentPageLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            currentPageLabel.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+            currentPageLabel.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -19),
 
             nextChapterButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            nextChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+            nextChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -19),
 
             sliderView.heightAnchor.constraint(equalToConstant: 12),
-            sliderView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+            sliderView.topAnchor.constraint(equalTo: topAnchor, constant: 4),
             sliderView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             sliderView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12)
         ])
@@ -180,15 +192,30 @@ class ReaderToolbarView: UIView {
     }
 
     @objc private func chapterButtonTapped() {
+        animateTap(on: chapterButton)
         onChapterListTap?()
     }
 
     @objc private func previousChapterButtonTapped() {
+        animateTap(on: previousChapterButton)
         onPreviousChapterTap?()
     }
 
     @objc private func nextChapterButtonTapped() {
+        animateTap(on: nextChapterButton)
         onNextChapterTap?()
+    }
+
+    /// Brief press effect so a tap reads as acknowledged at once, even
+    /// while the next chapter is still loading its pages.
+    private func animateTap(on button: UIButton) {
+        UIView.animate(withDuration: 0.08, animations: {
+            button.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        }, completion: { _ in
+            UIView.animate(withDuration: 0.12) {
+                button.transform = .identity
+            }
+        })
     }
 
     func displayPage(_ page: Int) {

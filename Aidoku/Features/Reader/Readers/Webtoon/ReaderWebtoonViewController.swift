@@ -1055,9 +1055,22 @@ extension ReaderWebtoonViewController: ReaderReaderDelegate {
     }
 
     func setChapter(_ chapter: AidokuRunner.Chapter, startPage: Int) {
+        let isChapterChange = chapter.id != self.chapter?.id
         self.chapter = chapter
         updateDoubleTapZoomSetting()
         chapters = [chapter]
+
+        if isChapterChange {
+            // Jump to the new chapter at once instead of leaving the old
+            // chapter on screen until its page list finishes loading:
+            // clear the displayed pages now; the loading task below
+            // refills them when they arrive.
+            pages = []
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                await self.collectionNode.reloadData()
+            }
+        }
 
         Task {
             await viewModel.loadPages(chapter: chapter)

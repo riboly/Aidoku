@@ -233,7 +233,7 @@ class ReaderViewController: BaseObservingViewController {
         toolbarView.onNextChapterTap = { [weak self] in self?.nextChapter() }
         toolbarView.translatesAutoresizingMaskIntoConstraints = false
         let toolbarButtonItemView = UIBarButtonItem(customView: toolbarView)
-        toolbarButtonItemView.customView?.heightAnchor.constraint(equalToConstant: 54).isActive = true
+        toolbarButtonItemView.customView?.heightAnchor.constraint(equalToConstant: 72).isActive = true
         if #available(iOS 26.0, *) {
             toolbarViewWidthConstraint = toolbarButtonItemView.customView?.widthAnchor.constraint(
                 equalToConstant: node.bounds.width - 32 - 10
@@ -1132,6 +1132,13 @@ extension ReaderViewController: @MainActor ReaderHoldingDelegate {
     }
 
     func setPages(_ pages: [Page]) {
+        // A chapter switch started from the toolbar has now landed (or
+        // failed): re-enable the previous/next buttons.
+        if isSwitchingChapter {
+            isSwitchingChapter = false
+            toolbarView.isSwitchingChapter = false
+            updateChapterNavigationButtons()
+        }
         // If already in a text reader with text pages, just update toolbar - don't trigger any switches
         if
             reader is ReaderPagedTextViewController || reader is ReaderTextViewController,
@@ -1763,16 +1770,36 @@ extension ReaderViewController {
     }
 
     @objc func nextChapter() {
-        if let nextChapter = getNextChapter() {
-            reader?.setChapter(nextChapter, startPage: 1)
-            setChapter(nextChapter)
-        }
+        // Ignore repeat taps while a switch is still loading its page
+        // list: the chapter already changed underneath, so a second tap
+        // would skip a chapter instead of retrying this one.
+        guard !isSwitchingChapter, let nextChapter = getNextChapter() else { return }
+        beginChapterSwitch()
+        reader?.setChapter(nextChapter, startPage: 1)
+        setChapter(nextChapter)
     }
 
     @objc func previousChapter() {
-        if let previousChaoter = getPreviousChapter() {
-            reader?.setChapter(previousChaoter, startPage: 1)
-            setChapter(previousChaoter)
-        }
+        guard !isSwitchingChapter, let previousChaoter = getPreviousChapter() else { return }
+        beginChapterSwitch()
+        reader?.setChapter(previousChaoter, startPage: 1)
+        setChapter(previousChaoter)
+    }
+
+    /// True while a chapter switch started from the bottom toolbar is
+    /// still loading its page list. Cleared in setPages(_:) once the new
+    /// chapter's pages arrive (or fail to).
+    private var isSwitchingChapter = false
+
+    /// Give immediate feedback for a chapter switch: the spinner starts
+    /// and the page label clears at once, so the tap reads as accepted
+    /// instead of doing nothing until the page list finishes loading.
+    private func beginChapterSwitch() {
+        isSwitchingChapter = true
+        toolbarView.isSwitchingChapter = true
+        activityIndicator.startAnimating()
+        toolbarView.totalPages = nil
+        toolbarView.currentPage = 1
+        toolbarView.updatePageLabels()
     }
 }
