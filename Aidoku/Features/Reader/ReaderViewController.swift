@@ -72,6 +72,11 @@ class ReaderViewController: BaseObservingViewController {
     private lazy var toolbarView = ReaderToolbarView()
     private var toolbarViewWidthConstraint: NSLayoutConstraint?
 
+    /// True while a chapter switch started from the bottom toolbar is
+    /// still loading its page list. Cleared in setPages(_:) once the new
+    /// chapter's pages arrive (or fail to).
+    private var isSwitchingChapter = false
+
     private var squeezeTimer: Timer?
     private var longSqueezeTimer: Timer?
     private var squeezeStartTime: Date?
@@ -1785,11 +1790,6 @@ extension ReaderViewController {
         reader?.setChapter(previousChaoter, startPage: 1)
         setChapter(previousChaoter)
     }
-
-    /// True while a chapter switch started from the bottom toolbar is
-    /// still loading its page list. Cleared in setPages(_:) once the new
-    /// chapter's pages arrive (or fail to).
-    private var isSwitchingChapter = false
 
     /// Give immediate feedback for a chapter switch: the spinner starts
     /// and the page label clears at once, so the tap reads as accepted
