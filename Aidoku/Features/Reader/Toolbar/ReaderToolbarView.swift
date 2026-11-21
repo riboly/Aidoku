@@ -163,10 +163,7 @@ class ReaderToolbarView: UIView {
             nextChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -19),
 
             sliderView.heightAnchor.constraint(equalToConstant: 12),
-            // Centered between the top of the bar and the button row:
-            // the bar is 96pt, the row sits at 77pt from the top, so
-            // the slider center is at ~38pt (top +32).
-            sliderView.topAnchor.constraint(equalTo: topAnchor, constant: 32),
+            sliderView.topAnchor.constraint(equalTo: topAnchor, constant: 16),
             sliderView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             sliderView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12)
         ])
