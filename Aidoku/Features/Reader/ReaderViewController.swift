@@ -72,6 +72,26 @@ class ReaderViewController: BaseObservingViewController {
     private lazy var toolbarView = ReaderToolbarView()
     private var toolbarViewWidthConstraint: NSLayoutConstraint?
 
+    /// Own bottom bar hosting the reader toolbar. The navigation
+    /// controller's toolbar cannot be made taller: it sizes its items
+    /// to its own fixed height, so the custom view's height constraint
+    /// was silently broken and the bar stayed ~49pt no matter what
+    /// height was set — that is why the slider and the buttons stayed
+    /// stuck together through the 54/72/96pt attempts. A plain effect
+    /// view pinned to the bottom sizes exactly as constrained, so the
+    /// 96pt layout inside it is real.
+    private lazy var bottomBar: UIVisualEffectView = {
+        let bar = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        return bar
+    }()
+    private lazy var bottomBarSeparator: UIView = {
+        let separator = UIView()
+        separator.backgroundColor = .separator
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        return separator
+    }()
+
     /// True while a chapter switch started from the bottom toolbar is
     /// still loading its page list. Cleared in setPages(_:) once the new
     /// chapter's pages arrive (or fail to).
@@ -230,33 +250,40 @@ class ReaderViewController: BaseObservingViewController {
 
         loadNavbarTitle()
 
-        // toolbar view
+        // Bottom bar: the reader toolbar lives in our own bar pinned to
+        // the bottom of this view, NOT in the navigation controller's
+        // toolbar. The nav toolbar sizes its items to its own fixed
+        // height, so the custom view's height constraint was silently
+        // broken and the bar stayed ~49pt no matter what height was
+        // set — that is why the slider and the buttons stayed stuck
+        // together through the 54/72/96pt attempts. A plain effect
+        // view pinned to the bottom sizes exactly as constrained, so
+        // the 96pt layout inside it is real: slider near the top,
+        // buttons 19pt above the safe area (same on-screen position
+        // as before), ~45pt between them.
         toolbarView.sliderView.addTarget(self, action: #selector(sliderMoved(_:)), for: .valueChanged)
         toolbarView.sliderView.addTarget(self, action: #selector(sliderStopped(_:)), for: .editingDidEnd)
         toolbarView.onChapterListTap = { [weak self] in self?.openChapterList() }
         toolbarView.onPreviousChapterTap = { [weak self] in self?.previousChapter() }
         toolbarView.onNextChapterTap = { [weak self] in self?.nextChapter() }
         toolbarView.translatesAutoresizingMaskIntoConstraints = false
-        let toolbarButtonItemView = UIBarButtonItem(customView: toolbarView)
-        toolbarButtonItemView.customView?.heightAnchor.constraint(equalToConstant: 96).isActive = true
+        toolbarView.heightAnchor.constraint(equalToConstant: 96).isActive = true
         if #available(iOS 26.0, *) {
-            toolbarViewWidthConstraint = toolbarButtonItemView.customView?.widthAnchor.constraint(
+            toolbarViewWidthConstraint = toolbarView.widthAnchor.constraint(
                 equalToConstant: node.bounds.width - 32 - 10
             )
         } else {
-            toolbarViewWidthConstraint = toolbarButtonItemView.customView?.widthAnchor.constraint(equalToConstant: view.bounds.width)
+            toolbarViewWidthConstraint = toolbarView.widthAnchor.constraint(equalToConstant: view.bounds.width)
         }
-        // No upward shift on the toolbar view: the bottom row is meant to
-        // sit at the vertical middle of the whole bottom bar, and the old
-        // -5 / -10 shift pushed it up above the middle, leaving a large
-        // empty gap down to the home indicator.
+        bottomBar.contentView.addSubview(toolbarView)
+        bottomBar.contentView.addSubview(bottomBarSeparator)
+        view.addSubview(bottomBar)
+        // The navigation controller's toolbar stays hidden: this
+        // reader's bottom bar is bottomBar above.
+        navigationController?.isToolbarHidden = true
 
         add(child: descriptionButtonController)
         view.addSubview(autoScrollButton)
-
-        toolbarItems = [toolbarButtonItemView]
-        navigationController?.isToolbarHidden = false
-        navigationController?.toolbar.fitContentViewToToolbar()
 
         // loading indicator
         activityIndicator.startAnimating()
@@ -310,7 +337,20 @@ class ReaderViewController: BaseObservingViewController {
 
             descriptionButtonController.view.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
 
-            autoScrollButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+            autoScrollButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+
+            bottomBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -96),
+            bottomBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            toolbarView.topAnchor.constraint(equalTo: bottomBar.contentView.topAnchor),
+            toolbarView.centerXAnchor.constraint(equalTo: bottomBar.contentView.centerXAnchor),
+
+            bottomBarSeparator.topAnchor.constraint(equalTo: bottomBar.contentView.topAnchor),
+            bottomBarSeparator.leadingAnchor.constraint(equalTo: bottomBar.contentView.leadingAnchor),
+            bottomBarSeparator.trailingAnchor.constraint(equalTo: bottomBar.contentView.trailingAnchor),
+            bottomBarSeparator.heightAnchor.constraint(equalToConstant: 0.5)
         ])
 
         updateAutoScrollButton()
@@ -401,7 +441,7 @@ class ReaderViewController: BaseObservingViewController {
         }
         if #available(iOS 26.0, *) {
             addObserver(forName: UIScene.willEnterForegroundNotification) { [weak self] _ in
-                if self?.navigationController?.toolbar.alpha == 0 {
+                if self?.bottomBar.alpha == 0 {
                     self?.hideBars()
                 }
             }
@@ -423,13 +463,13 @@ class ReaderViewController: BaseObservingViewController {
         sessionStartDate = Date.now
         sessionLastInteraction = nil
 
-        if navigationController?.toolbar.alpha == 0 {
+        if bottomBar.alpha == 0 {
             hideBars()
         }
 
         // there's a bug on ios 15 where the toolbar just disappears when adding a child hosting controller
-        navigationController?.isToolbarHidden = false
-        navigationController?.toolbar.alpha = 1
+        bottomBar.isHidden = false
+        bottomBar.alpha = 1
 
         disableSwipeGestures()
         configureNavigationBarDismissTapGesture(enabled: isDictionarySingleTapLookupActiveForCurrentChapter)
@@ -458,6 +498,14 @@ class ReaderViewController: BaseObservingViewController {
         Task {
             await updateReadPosition()
         }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Keep the bottom bar above the reader content and the floating
+        // buttons: the reader's view is inserted above this view's
+        // earlier subviews, so without this the bar would be covered.
+        view.bringSubviewToFront(bottomBar)
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -1607,25 +1655,15 @@ extension ReaderViewController {
             NotificationCenter.default.post(name: .readerShowingBars, object: nil)
 
             UIView.setAnimationsEnabled(false)
-            if #available(iOS 26.0, *) {
-                if navigationController.isToolbarHidden {
-                    (navigationController.value(forKey: "_floatingBarContainerView") as? UIView)?.alpha = 0
-                    navigationController.isToolbarHidden = false
-                }
-            } else {
-                if navigationController.toolbar.isHidden {
-                    navigationController.toolbar.alpha = 0
-                    navigationController.toolbar.isHidden = false
-                }
+            if self.bottomBar.isHidden {
+                self.bottomBar.alpha = 0
+                self.bottomBar.isHidden = false
             }
             navigationController.navigationBar.isHidden = false
             UIView.setAnimationsEnabled(true)
             UIView.animate(withDuration: CATransaction.animationDuration()) {
                 navigationController.navigationBar.alpha = 1
-                navigationController.toolbar.alpha = 1
-                if #available(iOS 26.0, *) {
-                    (navigationController.value(forKey: "_floatingBarContainerView") as? UIView)?.alpha = 1
-                }
+                self.bottomBar.alpha = 1
                 self.node.backgroundColor = if AppSettings.appearance.useSystemAppearance.get() {
                     .systemBackground
                 } else {
@@ -1652,11 +1690,7 @@ extension ReaderViewController {
 
             UIView.animate(withDuration: CATransaction.animationDuration()) {
                 navigationController.navigationBar.alpha = 0
-                navigationController.toolbar.alpha = 0
-
-                if #available(iOS 26.0, *) {
-                    (navigationController.value(forKey: "_floatingBarContainerView") as? UIView)?.alpha = 0
-                }
+                self.bottomBar.alpha = 0
 
                 self.node.backgroundColor = switch UserDefaults.standard.string(forKey: "Reader.backgroundColor") {
                     case "system":
@@ -1673,11 +1707,7 @@ extension ReaderViewController {
                 } else {
                     navigationController.navigationBar.isHidden = true
                 }
-                if #available(iOS 26.0, *) {
-                    navigationController.isToolbarHidden = true
-                } else {
-                    navigationController.toolbar.isHidden = true
-                }
+                self.bottomBar.isHidden = true
             }
         }
     }
