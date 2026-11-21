@@ -163,7 +163,7 @@ class ReaderToolbarView: UIView {
             nextChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -19),
 
             sliderView.heightAnchor.constraint(equalToConstant: 12),
-            sliderView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+            sliderView.topAnchor.constraint(equalTo: topAnchor, constant: 16),
             sliderView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             sliderView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12)
         ])
