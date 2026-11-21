@@ -144,10 +144,12 @@ class ReaderToolbarView: UIView {
             // Bottom row, all vertically centered on the same line:
             // chapter icon at the leading edge, page count centered,
             // and previous/next chapter grouped together at the trailing
-            // edge. The row sits at the vertical middle of the whole
-            // visible bottom bar: this view is 72pt tall and the toolbar
-            // adds the home-indicator safe area below it (~34pt), so the
-            // bar is ~106pt and its middle is ~53pt from the top.
+            // edge. The row is anchored 19pt above this view's bottom,
+            // i.e. at the same on-screen position as before: this view
+            // is 96pt tall and the toolbar adds the home-indicator safe
+            // area below it (~34pt), so the bar is ~130pt. The extra
+            // height goes entirely between the slider and the row, not
+            // under the row.
             chapterButton.leadingAnchor.constraint(equalTo: incognitoModeLabel.trailingAnchor, constant: 8),
             chapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -19),
 
@@ -161,7 +163,7 @@ class ReaderToolbarView: UIView {
             nextChapterButton.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -19),
 
             sliderView.heightAnchor.constraint(equalToConstant: 12),
-            sliderView.topAnchor.constraint(equalTo: topAnchor, constant: 4),
+            sliderView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
             sliderView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             sliderView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12)
         ])

@@ -238,7 +238,7 @@ class ReaderViewController: BaseObservingViewController {
         toolbarView.onNextChapterTap = { [weak self] in self?.nextChapter() }
         toolbarView.translatesAutoresizingMaskIntoConstraints = false
         let toolbarButtonItemView = UIBarButtonItem(customView: toolbarView)
-        toolbarButtonItemView.customView?.heightAnchor.constraint(equalToConstant: 72).isActive = true
+        toolbarButtonItemView.customView?.heightAnchor.constraint(equalToConstant: 96).isActive = true
         if #available(iOS 26.0, *) {
             toolbarViewWidthConstraint = toolbarButtonItemView.customView?.widthAnchor.constraint(
                 equalToConstant: node.bounds.width - 32 - 10
