@@ -194,18 +194,36 @@ extension ReaderSliderView {
     override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
         previousLocation = touch.location(in: self)
 
-        if thumbView.frame.contains(previousLocation) {
-            thumbView.tag = 1
-            UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseInOut) {
-                self.grabberView.transform = CGAffineTransform(scaleX: 3/2, y: 3/2)
-                if #available(iOS 26.0, *) {
-                    (self.grabberView as? LiquidLensView)?.setLifted(true, animated: true)
-                }
+        if !thumbView.frame.contains(previousLocation) {
+            // Tap on the track (not the thumb): jump the thumb to the
+            // tapped position first, then treat the touch as a drag
+            // from there — so a tap jumps, and a tap-and-hold still
+            // drags. Touch-up then fires .editingDidEnd as usual, which
+            // is what actually moves to the page.
+            let trackWidth = max(bounds.width - Self.trackInset * 2, 0)
+            guard trackWidth > 0 else { return false }
+            let x = min(max(previousLocation.x - Self.trackInset, 0), trackWidth)
+            let fraction = x / trackWidth
+            if direction == .forward {
+                currentValue = minimumValue + (maximumValue - minimumValue) * fraction
+            } else {
+                currentValue = maximumValue - (maximumValue - minimumValue) * fraction
             }
-            return true
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            updateLayerFrames()
+            CATransaction.commit()
+            sendActions(for: .valueChanged)
         }
 
-        return false
+        thumbView.tag = 1
+        UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseInOut) {
+            self.grabberView.transform = CGAffineTransform(scaleX: 3/2, y: 3/2)
+            if #available(iOS 26.0, *) {
+                (self.grabberView as? LiquidLensView)?.setLifted(true, animated: true)
+            }
+        }
+        return true
     }
 
     override func continueTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {

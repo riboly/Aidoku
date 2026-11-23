@@ -51,6 +51,7 @@ class ReaderToolbarView: UIView {
     }
 
     let sliderView = ReaderSliderView()
+    private let mangaChapterLabel = UILabel()
     private let incognitoModeLabel = UILabel()
     private let currentPageLabel = UILabel()
 
@@ -107,6 +108,12 @@ class ReaderToolbarView: UIView {
     }
 
     func configure() {
+        mangaChapterLabel.font = .systemFont(ofSize: 12)
+        mangaChapterLabel.textColor = .secondaryLabel
+        mangaChapterLabel.textAlignment = .center
+        mangaChapterLabel.lineBreakMode = .byTruncatingTail
+        addSubview(mangaChapterLabel)
+
         incognitoModeLabel.font = .systemFont(ofSize: 10)
         incognitoModeLabel.textColor = .secondaryLabel
         incognitoModeLabel.textAlignment = .left
@@ -130,6 +137,7 @@ class ReaderToolbarView: UIView {
     }
 
     func constrain() {
+        mangaChapterLabel.translatesAutoresizingMaskIntoConstraints = false
         incognitoModeLabel.translatesAutoresizingMaskIntoConstraints = false
         currentPageLabel.translatesAutoresizingMaskIntoConstraints = false
         chapterButton.translatesAutoresizingMaskIntoConstraints = false
@@ -138,6 +146,14 @@ class ReaderToolbarView: UIView {
         sliderView.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
+            // "MangaTitle-ChapterTitle" under the slider, centered in
+            // the gap between the slider (bottom at 28pt) and the
+            // button row (top at ~62pt): its center sits at 45pt.
+            mangaChapterLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+            mangaChapterLabel.centerYAnchor.constraint(equalTo: topAnchor, constant: 45),
+            mangaChapterLabel.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 16),
+            mangaChapterLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -16),
+
             incognitoModeLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             incognitoModeLabel.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -19),
 
@@ -183,10 +199,13 @@ class ReaderToolbarView: UIView {
             .store(in: &cancellables)
     }
 
-    // allow slider thumb to be touched outside bounds
+    // allow slider thumb to be touched outside bounds, and taps
+    // anywhere on the slider's own strip (not just on the 9pt track)
+    // to reach it so they can jump to the tapped position
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         for subview in subviews where subview is ReaderSliderView {
-            if subview.subviews.contains(where: { $0.bounds.contains(convert(point, to: $0)) }) {
+            if subview.bounds.contains(convert(point, to: subview))
+                || subview.subviews.contains(where: { $0.bounds.contains(convert(point, to: $0)) }) {
                 return subview
             }
         }
@@ -254,5 +273,19 @@ class ReaderToolbarView: UIView {
     func updateSliderPosition() {
         guard let currentPage = currentPage, let totalPages = totalPages else { return }
         sliderView.move(toValue: CGFloat(currentPage - 1) / max(CGFloat(totalPages - 1), 1))
+    }
+
+    /// "MangaTitle-ChapterTitle" under the slider; just the manga title
+    /// when the chapter has no title.
+    func setMangaChapterTitle(mangaTitle: String, chapterTitle: String?) {
+        let manga = mangaTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let chapter = chapterTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if manga.isEmpty {
+            mangaChapterLabel.text = chapter.isEmpty ? nil : chapter
+        } else if chapter.isEmpty {
+            mangaChapterLabel.text = manga
+        } else {
+            mangaChapterLabel.text = "\(manga)-\(chapter)"
+        }
     }
 }

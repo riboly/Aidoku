@@ -77,13 +77,23 @@ class ReaderViewController: BaseObservingViewController {
     /// to its own fixed height, so the custom view's height constraint
     /// was silently broken and the bar stayed ~49pt no matter what
     /// height was set — that is why the slider and the buttons stayed
-    /// stuck together through the 54/72/96pt attempts. A plain effect
-    /// view pinned to the bottom sizes exactly as constrained, so the
-    /// 96pt layout inside it is real.
-    private lazy var bottomBar: UIVisualEffectView = {
-        let bar = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
+    /// stuck together through the 54/72/96pt attempts. A plain view
+    /// pinned to the bottom sizes exactly as constrained, so the 96pt
+    /// layout inside it is real. The bar background is a blur view at
+    /// 80% opacity; the toolbar sits above it as a sibling, so its
+    /// text and icons stay fully opaque (fading the effect view
+    /// itself would fade the toolbar too, since it lives inside the
+    /// effect view's contentView).
+    private lazy var bottomBar: UIView = {
+        let bar = UIView()
         bar.translatesAutoresizingMaskIntoConstraints = false
         return bar
+    }()
+    private lazy var bottomBarBlurView: UIVisualEffectView = {
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
+        blur.alpha = 0.8
+        blur.translatesAutoresizingMaskIntoConstraints = false
+        return blur
     }()
     private lazy var bottomBarSeparator: UIView = {
         let separator = UIView()
@@ -241,6 +251,10 @@ class ReaderViewController: BaseObservingViewController {
         let toolbarAppearance = UIToolbarAppearance()
         navigationBarAppearance.configureWithDefaultBackground()
         toolbarAppearance.configureWithDefaultBackground()
+        // Reader bars are 80% opaque so the page shows through a
+        // little; the title and bar buttons sit above the background
+        // and stay fully opaque.
+        navigationBarAppearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
         navigationController?.navigationBar.standardAppearance = navigationBarAppearance
         navigationController?.navigationBar.compactAppearance = navigationBarAppearance
         navigationController?.navigationBar.scrollEdgeAppearance = navigationBarAppearance
@@ -275,8 +289,9 @@ class ReaderViewController: BaseObservingViewController {
         } else {
             toolbarViewWidthConstraint = toolbarView.widthAnchor.constraint(equalToConstant: view.bounds.width)
         }
-        bottomBar.contentView.addSubview(toolbarView)
-        bottomBar.contentView.addSubview(bottomBarSeparator)
+        bottomBar.addSubview(bottomBarBlurView)
+        bottomBar.addSubview(toolbarView)
+        bottomBar.addSubview(bottomBarSeparator)
         view.addSubview(bottomBar)
         // The navigation controller's toolbar stays hidden: this
         // reader's bottom bar is bottomBar above.
@@ -344,12 +359,17 @@ class ReaderViewController: BaseObservingViewController {
             bottomBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -96),
             bottomBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            toolbarView.topAnchor.constraint(equalTo: bottomBar.contentView.topAnchor),
-            toolbarView.centerXAnchor.constraint(equalTo: bottomBar.contentView.centerXAnchor),
+            bottomBarBlurView.leadingAnchor.constraint(equalTo: bottomBar.leadingAnchor),
+            bottomBarBlurView.trailingAnchor.constraint(equalTo: bottomBar.trailingAnchor),
+            bottomBarBlurView.topAnchor.constraint(equalTo: bottomBar.topAnchor),
+            bottomBarBlurView.bottomAnchor.constraint(equalTo: bottomBar.bottomAnchor),
 
-            bottomBarSeparator.topAnchor.constraint(equalTo: bottomBar.contentView.topAnchor),
-            bottomBarSeparator.leadingAnchor.constraint(equalTo: bottomBar.contentView.leadingAnchor),
-            bottomBarSeparator.trailingAnchor.constraint(equalTo: bottomBar.contentView.trailingAnchor),
+            toolbarView.topAnchor.constraint(equalTo: bottomBar.topAnchor),
+            toolbarView.centerXAnchor.constraint(equalTo: bottomBar.centerXAnchor),
+
+            bottomBarSeparator.topAnchor.constraint(equalTo: bottomBar.topAnchor),
+            bottomBarSeparator.leadingAnchor.constraint(equalTo: bottomBar.leadingAnchor),
+            bottomBarSeparator.trailingAnchor.constraint(equalTo: bottomBar.trailingAnchor),
             bottomBarSeparator.heightAnchor.constraint(equalToConstant: 0.5)
         ])
 
@@ -660,6 +680,7 @@ extension ReaderViewController {
         // re-apply theme title colors, since setTitle recreates the title view
         updateTextThemeOverride()
         updateChapterNavigationButtons()
+        toolbarView.setMangaChapterTitle(mangaTitle: manga.title ?? "", chapterTitle: chapter.title)
     }
 
     /// Enable/disable the bottom toolbar's previous/next chapter buttons.
