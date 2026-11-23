@@ -746,7 +746,36 @@ extension ReaderViewController {
                 self.loadCurrentChapter()
             }
         }
-        present(UIHostingController(rootView: view), animated: true)
+        let hostingController = UIHostingController(rootView: view)
+        // The list is a modal sheet, so the system's back-swipe does not
+        // apply to it. Add a left-edge swipe that dismisses it, and make
+        // the list's own scroll pan wait for that swipe, so the two do
+        // not fight over touches starting at the left edge.
+        let edgePan = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(dismissChapterList(_:)))
+        edgePan.edges = .left
+        hostingController.view.addGestureRecognizer(edgePan)
+        present(hostingController, animated: true) { [weak hostingController] in
+            guard let hostingController, let view = hostingController.view else { return }
+            self.wireScrollPans(in: view, toRequireFailureOf: edgePan)
+        }
+    }
+
+    @objc private func dismissChapterList(_ gesture: UIScreenEdgePanGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        // Only dismiss on a deliberate rightward swipe, not on a touch
+        // that started at the edge and went back.
+        if gesture.translation(in: gesture.view).x > 60 {
+            dismiss(animated: true)
+        }
+    }
+
+    private func wireScrollPans(in view: UIView, toRequireFailureOf gesture: UIGestureRecognizer) {
+        if let scrollView = view as? UIScrollView {
+            scrollView.panGestureRecognizer.require(toFail: gesture)
+        }
+        for subview in view.subviews {
+            wireScrollPans(in: subview, toRequireFailureOf: gesture)
+        }
     }
 
     @objc func close() {
@@ -902,6 +931,11 @@ extension ReaderViewController {
                     appearance.titleTextAttributes[.foregroundColor] = textColor
                 } else {
                     appearance.configureWithDefaultBackground()
+                    // configureWithDefaultBackground() resets the color to
+                    // opaque, which wiped the 80% alpha set in configure()
+                    // (loadNavbarTitle calls this right after configure).
+                    // Re-apply it so the top bar matches the bottom bar.
+                    appearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
                     appearance.titleTextAttributes.removeValue(forKey: .foregroundColor)
                 }
             }
