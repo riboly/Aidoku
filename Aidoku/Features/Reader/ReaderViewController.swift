@@ -1055,6 +1055,24 @@ extension ReaderViewController: @MainActor ReaderHoldingDelegate {
         return firstCandidate
     }
 
+    /// Step through chapterList toward the next chapter in reading
+    /// order: +1 when the list is ascending (ch 1 first), -1 when it
+    /// is descending (latest first, the historical assumption).
+    /// Sources disagree about list order, so detect it from the
+    /// chapter numbers at both ends; when they cannot be compared
+    /// (missing numbers, or both ends the same), keep the old
+    /// descending assumption.
+    private var nextChapterStep: Int {
+        guard
+            let first = chapterList.first?.chapterNumber,
+            let last = chapterList.last?.chapterNumber,
+            first != last
+        else {
+            return -1
+        }
+        return first < last ? 1 : -1
+    }
+
     func getNextChapter() -> AidokuRunner.Chapter? {
         guard
             var index = chapterList.firstIndex(of: chapter)
@@ -1065,10 +1083,11 @@ extension ReaderViewController: @MainActor ReaderHoldingDelegate {
         let skipDuplicates = UserDefaults.standard.bool(forKey: "Reader.skipDuplicateChapters")
         let markDuplicates = UserDefaults.standard.bool(forKey: "Reader.markDuplicateChapters")
 
-        index -= 1
+        let step = nextChapterStep
+        index += step
         var nextChapterInList: AidokuRunner.Chapter?
 
-        while index >= 0 {
+        while index >= 0 && index < chapterList.count {
             let new = chapterList[index]
             let identifier = ChapterIdentifier(sourceKey: manga.sourceKey, mangaKey: manga.key, chapterKey: new.key)
 
@@ -1085,12 +1104,12 @@ extension ReaderViewController: @MainActor ReaderHoldingDelegate {
                     chaptersToMark.append(new)
                 }
                 if !isDuplicate {
-                    return skipDuplicates ? findBestChapterMatch(from: index, step: -1) : nextChapterInList
+                    return skipDuplicates ? findBestChapterMatch(from: index, step: step) : nextChapterInList
                 } else if !skipDuplicates && !markDuplicates {
                     return new
                 }
             }
-            index -= 1
+            index += step
         }
         return nil
     }
@@ -1104,8 +1123,10 @@ extension ReaderViewController: @MainActor ReaderHoldingDelegate {
         // find previous non-duplicate chapter
         let markDuplicates = UserDefaults.standard.bool(forKey: "Reader.markDuplicateChapters")
 
-        index += 1
-        while index < chapterList.count {
+        // Previous is the opposite direction from next.
+        let step = -nextChapterStep
+        index += step
+        while index >= 0 && index < chapterList.count {
             let new = chapterList[index]
             let identifier = ChapterIdentifier(sourceKey: manga.sourceKey, mangaKey: manga.key, chapterKey: new.key)
 
@@ -1115,13 +1136,13 @@ extension ReaderViewController: @MainActor ReaderHoldingDelegate {
             if readable {
                 let isDuplicate = areDuplicates(new, chapter)
                 if !isDuplicate {
-                    return findBestChapterMatch(from: index, step: 1)
+                    return findBestChapterMatch(from: index, step: step)
                 }
                 if markDuplicates {
                     chaptersToMark.append(new)
                 }
             }
-            index += 1
+            index += step
         }
         return nil
     }
