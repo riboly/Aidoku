@@ -226,46 +226,68 @@ class ReaderViewController: BaseObservingViewController {
         }
     }
 
+    /// Wraps a top bar button in its pill background: the same
+    /// .systemMaterial blur at 80% opacity as the bottom bar, so the
+    /// buttons read the same over the manga art now that the bar
+    /// itself has no background. The container has an explicit frame
+    /// because bar button custom views are sized from their frame.
+    private func makeTopBarPillButton(_ button: UIButton, width: CGFloat) -> UIView {
+        let height: CGFloat = 36
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: width, height: height))
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
+        blur.alpha = 0.8
+        blur.frame = container.bounds
+        blur.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        container.addSubview(blur)
+        button.frame = container.bounds
+        button.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        container.addSubview(button)
+        container.layer.cornerRadius = height / 2
+        container.clipsToBounds = true
+        return container
+    }
+
     override func configure() {
         node.backgroundColor = .systemBackground
         navigationController?.navigationBar.prefersLargeTitles = false
 
         // navbar buttons: only close stays at the top left. The chapter
         // list button moved to the bottom toolbar (see ReaderToolbarView),
-        // so it is reachable with the thumb while reading.
-        navigationItem.leftBarButtonItems = [
-            UIBarButtonItem(
-                barButtonSystemItem: .close,
-                target: self,
-                action: #selector(close)
-            )
-        ]
-        let moreButton = UIBarButtonItem(
-            image: UIImage(systemName: "safari"),
-            style: .plain,
-            target: self,
-            action: #selector(openWebView)
+        // so it is reachable with the thumb while reading. The bar
+        // itself has no background (see below), so each button carries
+        // its own pill background at the same 80% opacity as the
+        // bottom bar; the title keeps its original style.
+        let closeButton = UIButton(type: .system)
+        closeButton.setImage(
+            UIImage(systemName: "xmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)),
+            for: .normal
         )
+        closeButton.addTarget(self, action: #selector(close), for: .touchUpInside)
+        navigationItem.leftBarButtonItems = [
+            UIBarButtonItem(customView: makeTopBarPillButton(closeButton, width: 36))
+        ]
+        let moreButton = UIButton(type: .system)
+        moreButton.setImage(UIImage(systemName: "safari"), for: .normal)
+        moreButton.addTarget(self, action: #selector(openWebView), for: .touchUpInside)
         moreButton.isEnabled = chapter.url != nil
+        let textSizeButton = UIButton(type: .system)
+        textSizeButton.setTitle(NSLocalizedString("SIZE"), for: .normal)
+        textSizeButton.titleLabel?.font = .systemFont(ofSize: 17)
+        textSizeButton.contentEdgeInsets = UIEdgeInsets(top: 0, left: 14, bottom: 0, right: 14)
+        textSizeButton.sizeToFit()
+        textSizeButton.addTarget(self, action: #selector(openReaderSettings), for: .touchUpInside)
         navigationItem.rightBarButtonItems = [
-            moreButton,
-            UIBarButtonItem(
-                image: UIImage(systemName: "textformat.size"),
-                style: .plain,
-                target: self,
-                action: #selector(openReaderSettings)
-            )
+            UIBarButtonItem(customView: makeTopBarPillButton(moreButton, width: 36)),
+            UIBarButtonItem(customView: makeTopBarPillButton(textSizeButton, width: textSizeButton.bounds.width))
         ]
 
-        // fix navbar being clear
+        // Top bar has no background: the manga art shows through to
+        // the top edge. The navigation controller's toolbar stays on
+        // its default background (it is hidden in the reader).
         let navigationBarAppearance = UINavigationBarAppearance()
         let toolbarAppearance = UIToolbarAppearance()
-        navigationBarAppearance.configureWithDefaultBackground()
+        navigationBarAppearance.configureWithTransparentBackground()
         toolbarAppearance.configureWithDefaultBackground()
-        // Reader bars are 80% opaque so the page shows through a
-        // little; the title and bar buttons sit above the background
-        // and stay fully opaque.
-        navigationBarAppearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
         navigationController?.navigationBar.standardAppearance = navigationBarAppearance
         navigationController?.navigationBar.compactAppearance = navigationBarAppearance
         navigationController?.navigationBar.scrollEdgeAppearance = navigationBarAppearance
@@ -950,12 +972,13 @@ extension ReaderViewController {
                     }
                     appearance.titleTextAttributes[.foregroundColor] = textColor
                 } else {
-                    appearance.configureWithDefaultBackground()
-                    // configureWithDefaultBackground() resets the color to
-                    // opaque, which wiped the 80% alpha set in configure()
-                    // (loadNavbarTitle calls this right after configure).
-                    // Re-apply it so the top bar matches the bottom bar.
-                    appearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
+                    // No bar background at all: the manga art shows
+                    // through and the buttons carry their own pill
+                    // backgrounds. (This runs right after configure()
+                    // via loadNavbarTitle, and on every chapter change,
+                    // so the transparency must be applied here too or
+                    // the solid bar would come back.)
+                    appearance.configureWithTransparentBackground()
                     appearance.titleTextAttributes.removeValue(forKey: .foregroundColor)
                 }
             }
