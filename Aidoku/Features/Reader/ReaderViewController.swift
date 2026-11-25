@@ -102,6 +102,17 @@ class ReaderViewController: BaseObservingViewController {
         return separator
     }()
 
+    /// Transparent strip above the bottom bar (Solution A for slider
+    /// mis-taps). Hidden/shown together with bottomBar — see
+    /// showBars/hideBars/viewDidAppear — so it never eats page taps
+    /// while the bars are hidden.
+    private lazy var sliderExtensionView: ReaderSliderExtensionView = {
+        let strip = ReaderSliderExtensionView()
+        strip.slider = toolbarView.sliderView
+        strip.translatesAutoresizingMaskIntoConstraints = false
+        return strip
+    }()
+
     /// True while a chapter switch started from the bottom toolbar is
     /// still loading its page list. Cleared in setPages(_:) once the new
     /// chapter's pages arrive (or fail to).
@@ -293,6 +304,7 @@ class ReaderViewController: BaseObservingViewController {
         bottomBar.addSubview(toolbarView)
         bottomBar.addSubview(bottomBarSeparator)
         view.addSubview(bottomBar)
+        view.addSubview(sliderExtensionView)
         // The navigation controller's toolbar stays hidden: this
         // reader's bottom bar is bottomBar above.
         navigationController?.isToolbarHidden = true
@@ -358,6 +370,11 @@ class ReaderViewController: BaseObservingViewController {
             bottomBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             bottomBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -96),
             bottomBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            sliderExtensionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            sliderExtensionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sliderExtensionView.bottomAnchor.constraint(equalTo: bottomBar.topAnchor),
+            sliderExtensionView.heightAnchor.constraint(equalToConstant: 30),
 
             bottomBarBlurView.leadingAnchor.constraint(equalTo: bottomBar.leadingAnchor),
             bottomBarBlurView.trailingAnchor.constraint(equalTo: bottomBar.trailingAnchor),
@@ -490,6 +507,8 @@ class ReaderViewController: BaseObservingViewController {
         // there's a bug on ios 15 where the toolbar just disappears when adding a child hosting controller
         bottomBar.isHidden = false
         bottomBar.alpha = 1
+        sliderExtensionView.isHidden = false
+        sliderExtensionView.alpha = 1
 
         disableSwipeGestures()
         configureNavigationBarDismissTapGesture(enabled: isDictionarySingleTapLookupActiveForCurrentChapter)
@@ -526,6 +545,7 @@ class ReaderViewController: BaseObservingViewController {
         // buttons: the reader's view is inserted above this view's
         // earlier subviews, so without this the bar would be covered.
         view.bringSubviewToFront(bottomBar)
+        view.bringSubviewToFront(sliderExtensionView)
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -1734,12 +1754,15 @@ extension ReaderViewController {
             if self.bottomBar.isHidden {
                 self.bottomBar.alpha = 0
                 self.bottomBar.isHidden = false
+                self.sliderExtensionView.alpha = 0
+                self.sliderExtensionView.isHidden = false
             }
             navigationController.navigationBar.isHidden = false
             UIView.setAnimationsEnabled(true)
             UIView.animate(withDuration: CATransaction.animationDuration()) {
                 navigationController.navigationBar.alpha = 1
                 self.bottomBar.alpha = 1
+                self.sliderExtensionView.alpha = 1
                 self.node.backgroundColor = if AppSettings.appearance.useSystemAppearance.get() {
                     .systemBackground
                 } else {
@@ -1767,6 +1790,7 @@ extension ReaderViewController {
             UIView.animate(withDuration: CATransaction.animationDuration()) {
                 navigationController.navigationBar.alpha = 0
                 self.bottomBar.alpha = 0
+                self.sliderExtensionView.alpha = 0
 
                 self.node.backgroundColor = switch UserDefaults.standard.string(forKey: "Reader.backgroundColor") {
                     case "system":
@@ -1784,6 +1808,7 @@ extension ReaderViewController {
                     navigationController.navigationBar.isHidden = true
                 }
                 self.bottomBar.isHidden = true
+                self.sliderExtensionView.isHidden = true
             }
         }
     }

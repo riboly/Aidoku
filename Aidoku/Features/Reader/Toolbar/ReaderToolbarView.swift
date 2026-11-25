@@ -289,3 +289,35 @@ class ReaderToolbarView: UIView {
         }
     }
 }
+
+/// Transparent touch strip pinned just above the reader's bottom bar
+/// (Solution A for slider mis-taps). Taps that land just above the
+/// bar are forwarded to the slider, so they jump the slider instead
+/// of hitting the page and hiding the bars. It is a UIControl, so the
+/// bar-toggle tap gesture's delegate refuses touches on it — it only
+/// accepts touches outside controls — and no delegate change is
+/// needed. Forwarding uses the slider's own tracking, so tap-to-jump,
+/// drag, RTL direction and the thumb animation all behave exactly
+/// like touching the slider itself.
+final class ReaderSliderExtensionView: UIControl {
+    weak var slider: ReaderSliderView?
+
+    override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
+        guard let slider else { return false }
+        return slider.beginTracking(touch, with: event)
+    }
+
+    override func continueTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
+        guard let slider else { return false }
+        return slider.continueTracking(touch, with: event)
+    }
+
+    override func endTracking(_ touch: UITouch?, with event: UIEvent?) {
+        guard let slider, let touch else { return }
+        slider.endTracking(touch, with: event)
+    }
+
+    override func cancelTracking(with event: UIEvent?) {
+        slider?.cancelTracking(with: event)
+    }
+}
