@@ -27,7 +27,7 @@ jobs:
           cp -r build/Aidoku.xcarchive/Products/Applications/Aidoku.app Payload
           zip -r Aidoku-iOS_nightly-${{ steps.commitinfo.outputs.sha_short }}.ipa Payload
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Aidoku-iOS_nightly-${{ steps.commitinfo.outputs.sha_short }}.ipa
           path: Aidoku-iOS_nightly-${{ steps.commitinfo.outputs.sha_short }}.ipa
